@@ -70,6 +70,18 @@ The ***RedisClient*** class located in the ***utils/redis.js*** file provides me
 - **set(key, value, duration)**: Stores a value with an expiration time.
 - **del(key)**: Deletes the value associated with the key.
 
+### DB Client
+
+The ***DBClient*** class located in the ***utils/db.js*** file provides methods to interact with the MongoDB database:
+
+- **isAlive()**: Returns true if the connection to MongoDB is successful, otherwise false.
+- **nbUsers()**: Returns the number of documents in the users collection.
+- **nbFiles**: Returns the number of documents in the files collection.
+
+#### Example Usage
+
+You can use the dbClient instance as follows:
+
 ## Contributing
 
 Contributions are welcome! Pleae follow these steps:

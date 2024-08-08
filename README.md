@@ -24,25 +24,25 @@ This project is a simple platform for uploading and viewing files. It includes u
 ## Installation
 
 1. Clone the repository:
-``bash
+``bash``
 git clone *repository-url*
 
 2. Navigate to the project directory:
-``bash
+``bash``
 cd *project-directory*
 
 3. Install the dependeccis:
-``bash
+``bash``
 npm install
 
 4. Set up environment variables(create a .env file):
-``plaintext
+``plaintext``
 MONGO_URL=*your-mongo-uri*
 REDIS_URL=*your-redis-url*
 JWT_SECRET=*your-jwt-secret*
 
 5. Start the server
-``bash
+``bash``
 npm start
 
 ## Usage
@@ -63,12 +63,31 @@ npm start
 
 ### Redis Client
 
-The ***RedisClient*** class located in the ***utils/redis.js*** file provides methods to interact with the Redis database:
+The `RedisClient` class located in the `utils/redis.js` file provides methods to interact with the Redis database:
 
-- **isAlive()**: Checks if the Redis connection is alive.
-- **get(key)**: Retrieves the value associated with the key.
-- **set(key, value, duration)**: Stores a value with an expiration time.
-- **del(key)**: Deletes the value associated with the key.
+- `isAlive()`: Checks if the Redis connection is alive.
+- `get(key)`: Retrieves the value associated with the key.
+- `set(key, value, duration)`: Stores a value with an expiration time.
+- `del(key)`: Deletes the value associated with the key.
+
+#### Usage
+
+To use the Redis client, import the `redisClient` instacce from the `utils/redis.js` file.
+
+```javascript```
+import redisClient from './utils/redis';
+
+(async () => {
+    console.log(redisClient.isAlive());
+    console.log(await redisClient.get('myKey'));
+    await redisClient.set('myKey', 12, 5);
+    console.log(await redisClient.get('myKey'));
+
+    setTimeout(async () => {
+        console.log(await redisClient.get('myKey'));
+    }, 1000*10)
+})();
+
 
 ### DB Client
 

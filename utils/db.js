@@ -1,63 +1,43 @@
 // utils/db.js
-import MongoClient from 'mongodb';
+const { MongoClient } = require('mongodb');
 
 class DBClient {
   constructor() {
-    // const host = process.env.DB_HOST || 'localhost';
-    // const port = process.env.DB_PORT || 27017;
-    // const database = process.env.DB_DATABASE || 'file_manager';
+    const host = process.env.DB_HOST || 'localhost';
+    const port = process.env.DB_PORT || 27017;
+    const database = process.env.DB_DATABASE || 'files_manager';
 
-    // this.url = `mongodb://${host}:${port}`;
-    // this.client = new MongoClient(this.url);
-    // this.dbName = database;
-
-    // // Database Connection
-    // this.client.connect().then(() => {
-    //   console.log('MongoDB client connected successfully');
-    // }).catch((err) => {
-    //   console.error('MongoDB client Error', err);
-    // });
-
-    this.client = null;
-    this.database = null;
-    this.isConnected = false;
+    this.url = `mongodb://${host}:${port}`;
+    this.client = new MongoClient(this.url);
+    this.db = null;
+    this.connect(database);
   }
 
-  async connect() {
+  async connect(database) {
     try {
-      this.client = await MongoClient.connect(process.env.MONGO_URL, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true
-      });
-      this.database = this.client.db(process.env.DB_DATABASE || 'files_manager');
-      this.isConnected = true;
-    } catch (error) {
-      console.error('Database connection failed:', error);
-      this.isConnected = false;
+      await this.client.connect();
+      this.db = this.client.db(database);
+      console.log('Connected to MongoDB');
+    } catch (err) {
+      console.error('MongoDB Client Error:', err);
     }
   }
 
   isAlive() {
-    return this.isConnected; // Returns true or false
+    return this.client.isConnected(); // Returns true if connected, false otherwise
   }
 
   async nbUsers() {
-    if (!this.isAlive()) {
-      throw new Error('Database not connected');
-    }
-    const usersCollection = this.database.collection('users');
-    return await usersCollection.countDocuments();
+    if (!this.db) throw new Error('Database not connected');
+    return this.db.collection('users').countDocuments();
   }
 
   async nbFiles() {
-    if (!this.isAlive()) {
-      throw new Error('Database not connected');
-    }
-    const filesCollection = this.database.collection('files');
-    return await filesCollection.countDocuments();
+    if (!this.db) throw new Error('Database not connected');
+    return this.db.collection('files').countDocuments();
   }
 }
 
-// Create and exports an instance of DBClient
-const DbClient = new DBClient();
-module.exports = DbClient;
+// Create and export an instance of DBClient
+const dbClient = new DBClient();
+module.exports = dbClient;

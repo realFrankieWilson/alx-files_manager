@@ -21,7 +21,8 @@ class DBClient {
 
   isAlive() {
     // Check if the client is connected and the topology is defined
-    return this.client.topology?.isConnected() ?? false;
+    return this.client && this.client.topology && this.client.topology.isConnected()
+      ? this.client.topology.isConnected() : false;
   }
 
   async nbUsers() {

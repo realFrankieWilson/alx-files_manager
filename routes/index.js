@@ -4,6 +4,7 @@ const AppController = require('../controllers/AppController'); // Import the con
 
 // Define the endpoints
 router.get('/status', AppController.getStatus);
+
 router.get('/stats', AppController.getStats);
 
 module.exports = router;

@@ -27,12 +27,16 @@ class FilesController {
 
     // Check if parentId exists and is a folder
     if (parentId !== '0') {
-      const parentFile = await dbClient.db.collection('files').findOne({ _id: new ObjectId(parentId) });
-      if (!parentFile) {
+      try {
+        const parentFile = await dbClient.db.collection('files').findOne({ _id: new ObjectId(parentId) });
+        if (!parentFile) {
+          return res.status(400).json({ error: 'Parent not found' });
+        }
+        if (parentFile.type !== 'folder') {
+          return res.status(400).json({ error: 'Parent is not a folder' });
+        }
+      } catch (error) {
         return res.status(400).json({ error: 'Parent not found' });
-      }
-      if (parentFile.type !== 'folder') {
-        return res.status(400).json({ error: 'Parent is not a folder' });
       }
     }
 
@@ -54,13 +58,17 @@ class FilesController {
       const localPath = `${folderPath}/${new ObjectId()}`;
 
       const buffer = Buffer.from(data, 'base64');
-      await fs.promises.mkdir(folderPath, { recursive: true });
-      await fs.promises.writeFile(localPath, buffer);
+      try {
+        await fs.promises.mkdir(folderPath, { recursive: true });
+        await fs.promises.writeFile(localPath, buffer);
 
-      fileData.localPath = localPath;
+        fileData.localPath = localPath;
 
-      const result = await dbClient.db.collection('files').insertOne(fileData);
-      return res.status(201).json({ id: result.insertedId, ...fileData });
+        const result = await dbClient.db.collection('files').insertOne(fileData);
+        return res.status(201).json({ id: result.insertedId, ...fileData });
+      } catch (error) {
+        return res.status(500).json({ error: 'Error saving file' });
+      }
     }
   }
 

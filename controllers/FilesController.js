@@ -4,13 +4,7 @@ const { ObjectId } = require('mongodb');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
-/**
- * FilesController class for handling file-related operations.
- */
 class FilesController {
-  /**
-   * Handle file upload (POST /files).
-   */
   static async postUpload(req, res) {
     const token = req.header('X-Token');
     if (!token) {
@@ -37,19 +31,16 @@ class FilesController {
     }
 
     if (parentId !== 0) {
-      let parentFile;
       try {
-        parentFile = await dbClient.db.collection('files').findOne({ _id: new ObjectId(parentId) });
+        const parentFile = await dbClient.db.collection('files').findOne({ _id: new ObjectId(parentId) });
+        if (!parentFile) {
+          return res.status(400).json({ error: 'Parent not found' });
+        }
+        if (parentFile.type !== 'folder') {
+          return res.status(400).json({ error: 'Parent is not a folder' });
+        }
       } catch (err) {
         return res.status(400).json({ error: 'Invalid parentId' });
-      }
-
-      if (!parentFile) {
-        return res.status(400).json({ error: 'Parent not found' });
-      }
-
-      if (parentFile.type !== 'folder') {
-        return res.status(400).json({ error: 'Parent is not a folder' });
       }
     }
 
@@ -89,9 +80,6 @@ class FilesController {
     });
   }
 
-  /**
-   * Retrieve a specific file document based on the ID (GET /files/:id).
-   */
   static async getShow(req, res) {
     const token = req.header('X-Token');
     if (!token) {
@@ -124,9 +112,6 @@ class FilesController {
     }
   }
 
-  /**
-   * Retrieve all user file documents for a specific parentId with pagination (GET /files).
-   */
   static async getIndex(req, res) {
     const token = req.header('X-Token');
     if (!token) {
@@ -143,9 +128,16 @@ class FilesController {
     const limit = 20;
 
     try {
+      const query = { userId: new ObjectId(userId) };
+      if (parentId !== '0') {
+        query.parentId = new ObjectId(parentId);
+      } else {
+        query.parentId = '0';
+      }
+
       const files = await dbClient.db.collection('files')
         .aggregate([
-          { $match: { userId: new ObjectId(userId), parentId: parentId === '0' ? '0' : new ObjectId(parentId) } },
+          { $match: query },
           { $skip: page * limit },
           { $limit: limit },
         ]).toArray();

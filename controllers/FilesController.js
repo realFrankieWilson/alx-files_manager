@@ -5,6 +5,9 @@ const redisClient = require('../utils/redis');
 const dbClient = require('../utils/db');
 
 class FilesController {
+  /**
+   * Handle file upload (POST /files).
+   */
   static async postUpload(req, res) {
     const token = req.header('X-Token');
     if (!token) {
@@ -20,6 +23,7 @@ class FilesController {
       name, type, parentId = '0', isPublic = false, data,
     } = req.body;
 
+    // Validate required fields
     if (!name) {
       return res.status(400).json({ error: 'Missing name' });
     }
@@ -32,9 +36,13 @@ class FilesController {
       return res.status(400).json({ error: 'Missing data' });
     }
 
+    // Validate parentId
+    let parentObjectId = '0';
     if (parentId !== '0') {
       try {
-        const parentFile = await dbClient.db.collection('files').findOne({ _id: new ObjectId(parentId) });
+        parentObjectId = new ObjectId(parentId); // Convert parentId to ObjectId
+        const parentFile = await dbClient.db.collection('files').findOne({ _id: parentObjectId });
+
         if (!parentFile) {
           return res.status(400).json({ error: 'Parent not found' });
         }
@@ -46,14 +54,16 @@ class FilesController {
       }
     }
 
+    // Prepare the file data to be inserted
     const fileData = {
       userId: new ObjectId(userId),
       name,
       type,
       isPublic,
-      parentId: parentId === '0' ? '0' : new ObjectId(parentId),
+      parentId: parentObjectId, // Use the validated parentId
     };
 
+    // If the type is a folder, create it directly in the database
     if (type === 'folder') {
       try {
         const result = await dbClient.db.collection('files').insertOne(fileData);
@@ -71,6 +81,7 @@ class FilesController {
       }
     }
 
+    // Handle file or image type
     const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
     if (!fs.existsSync(folderPath)) {
       fs.mkdirSync(folderPath, { recursive: true });
@@ -85,6 +96,7 @@ class FilesController {
 
     fileData.localPath = localPath;
 
+    // Insert file data into the database
     try {
       const result = await dbClient.db.collection('files').insertOne(fileData);
       fileData.id = result.insertedId;
@@ -101,6 +113,9 @@ class FilesController {
     }
   }
 
+  /**
+   * Retrieve a specific file document based on the ID (GET /files/:id).
+   */
   static async getShow(req, res) {
     const token = req.header('X-Token');
     if (!token) {
@@ -133,6 +148,9 @@ class FilesController {
     }
   }
 
+  /**
+   * Retrieve all user file documents for a specific parentId with pagination (GET /files).
+   */
   static async getIndex(req, res) {
     const token = req.header('X-Token');
     if (!token) {

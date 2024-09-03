@@ -1,7 +1,6 @@
-const fs = require('fs');
-const { v4: uuidv4 } = require('uuid');
-const dbClient = require('../utils/db');
 const { ObjectId } = require('mongodb');
+const dbClient = require('../utils/db');
+const redisClient = require('../utils/redis');
 
 const FOLDER_PATH = process.env.FOLDER_PATH || '/tmp/files_manager';
 

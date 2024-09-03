@@ -17,7 +17,7 @@ class FilesController {
     }
 
     const {
-      name, type, parentId = 0, isPublic = false, data,
+      name, type, parentId = '0', isPublic = false, data,
     } = req.body;
 
     if (!name) {
@@ -32,7 +32,7 @@ class FilesController {
       return res.status(400).json({ error: 'Missing data' });
     }
 
-    if (parentId !== 0) {
+    if (parentId !== '0') {
       try {
         const parentFile = await dbClient.db.collection('files').findOne({ _id: new ObjectId(parentId) });
         if (!parentFile) {
@@ -51,13 +51,24 @@ class FilesController {
       name,
       type,
       isPublic,
-      parentId: parentId === 0 ? '0' : new ObjectId(parentId),
+      parentId: parentId === '0' ? '0' : new ObjectId(parentId),
     };
 
     if (type === 'folder') {
-      const result = await dbClient.db.collection('files').insertOne(fileData);
-      fileData.id = result.insertedId;
-      return res.status(201).json(fileData);
+      try {
+        const result = await dbClient.db.collection('files').insertOne(fileData);
+        fileData.id = result.insertedId;
+        return res.status(201).json({
+          id: fileData.id,
+          userId: fileData.userId,
+          name: fileData.name,
+          type: fileData.type,
+          isPublic: fileData.isPublic,
+          parentId: fileData.parentId,
+        });
+      } catch (error) {
+        return res.status(500).json({ error: 'Failed to create folder' });
+      }
     }
 
     const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
@@ -66,20 +77,28 @@ class FilesController {
     }
 
     const localPath = `${folderPath}/${uuidv4()}`;
-    fs.writeFileSync(localPath, Buffer.from(data, 'base64'));
+    try {
+      fs.writeFileSync(localPath, Buffer.from(data, 'base64'));
+    } catch (error) {
+      return res.status(500).json({ error: 'Failed to save file' });
+    }
 
     fileData.localPath = localPath;
-    const result = await dbClient.db.collection('files').insertOne(fileData);
-    fileData.id = result.insertedId;
 
-    return res.status(201).json({
-      id: fileData.id,
-      userId: fileData.userId,
-      name: fileData.name,
-      type: fileData.type,
-      isPublic: fileData.isPublic,
-      parentId: fileData.parentId,
-    });
+    try {
+      const result = await dbClient.db.collection('files').insertOne(fileData);
+      fileData.id = result.insertedId;
+      return res.status(201).json({
+        id: fileData.id,
+        userId: fileData.userId,
+        name: fileData.name,
+        type: fileData.type,
+        isPublic: fileData.isPublic,
+        parentId: fileData.parentId,
+      });
+    } catch (error) {
+      return res.status(500).json({ error: 'Failed to save file in database' });
+    }
   }
 
   static async getShow(req, res) {

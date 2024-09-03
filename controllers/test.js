@@ -4,13 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const redisClient = require('../utils/redis');
 const dbClient = require('../utils/db');
 
-/**
- * FilesController class for handling file-related operations.
- */
 class FilesController {
-  /**
-   * Handle file upload (POST /files).
-   */
   static async postUpload(req, res) {
     const token = req.header('X-Token');
     if (!token) {
@@ -39,12 +33,16 @@ class FilesController {
     }
 
     if (parentId !== 0) {
-      const parentFile = await dbClient.db.collection('files').findOne({ _id: new ObjectId(parentId) });
-      if (!parentFile) {
-        return res.status(400).json({ error: 'Parent not found' });
-      }
-      if (parentFile.type !== 'folder') {
-        return res.status(400).json({ error: 'Parent is not a folder' });
+      try {
+        const parentFile = await dbClient.db.collection('files').findOne({ _id: new ObjectId(parentId) });
+        if (!parentFile) {
+          return res.status(400).json({ error: 'Parent not found' });
+        }
+        if (parentFile.type !== 'folder') {
+          return res.status(400).json({ error: 'Parent is not a folder' });
+        }
+      } catch (err) {
+        return res.status(400).json({ error: 'Invalid parentId' });
       }
     }
 
@@ -57,7 +55,8 @@ class FilesController {
     };
 
     if (type === 'folder') {
-      await dbClient.db.collection('files').insertOne(fileData);
+      const result = await dbClient.db.collection('files').insertOne(fileData);
+      fileData.id = result.insertedId;
       return res.status(201).json(fileData);
     }
 
@@ -70,10 +69,11 @@ class FilesController {
     fs.writeFileSync(localPath, Buffer.from(data, 'base64'));
 
     fileData.localPath = localPath;
-    await dbClient.db.collection('files').insertOne(fileData);
+    const result = await dbClient.db.collection('files').insertOne(fileData);
+    fileData.id = result.insertedId;
 
     return res.status(201).json({
-      id: fileData._id,
+      id: fileData.id,
       userId: fileData.userId,
       name: fileData.name,
       type: fileData.type,
@@ -82,9 +82,6 @@ class FilesController {
     });
   }
 
-  /**
-   * Retrieve a specific file document based on the ID (GET /files/:id).
-   */
   static async getShow(req, res) {
     const token = req.header('X-Token');
     if (!token) {
@@ -117,9 +114,6 @@ class FilesController {
     }
   }
 
-  /**
-   * Retrieve all user file documents for a specific parentId with pagination (GET /files).
-   */
   static async getIndex(req, res) {
     const token = req.header('X-Token');
     if (!token) {
@@ -136,9 +130,16 @@ class FilesController {
     const limit = 20;
 
     try {
+      const query = { userId: new ObjectId(userId) };
+      if (parentId !== '0') {
+        query.parentId = new ObjectId(parentId);
+      } else {
+        query.parentId = '0';
+      }
+
       const files = await dbClient.db.collection('files')
         .aggregate([
-          { $match: { userId: new ObjectId(userId), parentId: parentId === '0' ? '0' : new ObjectId(parentId) } },
+          { $match: query },
           { $skip: page * limit },
           { $limit: limit },
         ]).toArray();

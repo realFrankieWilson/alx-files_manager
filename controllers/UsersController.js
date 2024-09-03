@@ -1,5 +1,7 @@
 const sha1 = require('sha1'); // Import the sha1 module for hashing passwords
+const redisClient = require('../utils/redis'); // Correctly import the Redis client utility
 const dbClient = require('../utils/db'); // Import the DB utility
+const { ObjectId } = require('mongodb'); // Import ObjectId from the MongoDB library
 
 class UsersController {
   static async postNew(req, res) {
@@ -40,6 +42,28 @@ class UsersController {
       console.error('Error creating user:', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
+  }
+
+    // New endpoint for retrieving user information based on the token
+  static async getMe(req, res) {
+    const token = req.header('X-Token');
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const userId = await redisClient.get(`auth_${token}`);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Find the user in the database
+    const user = await dbClient.db.collection('users').findOne({ _id: new ObjectId(userId) });
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Return the user object (email and id only)
+    return res.status(200).json({ id: user._id, email: user.email });
   }
 }
 

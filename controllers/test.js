@@ -1,8 +1,8 @@
-const dbClient = require('../utils/db');
-const redisClient = require('../utils/redis');
 const { ObjectId } = require('mongodb');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
+const redisClient = require('../utils/redis');
+const dbClient = require('../utils/db');
 
 /**
  * FilesController class for handling file-related operations.
@@ -22,7 +22,9 @@ class FilesController {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { name, type, parentId = 0, isPublic = false, data } = req.body;
+    const {
+      name, type, parentId = 0, isPublic = false, data,
+    } = req.body;
 
     if (!name) {
       return res.status(400).json({ error: 'Missing name' });

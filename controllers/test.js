@@ -37,17 +37,10 @@ class FilesController {
     }
 
     if (parentId !== 0) {
-      let parentFile;
-      try {
-        parentFile = await dbClient.db.collection('files').findOne({ _id: new ObjectId(parentId) });
-      } catch (err) {
-        return res.status(400).json({ error: 'Invalid parentId' });
-      }
-
+      const parentFile = await dbClient.db.collection('files').findOne({ _id: new ObjectId(parentId) });
       if (!parentFile) {
         return res.status(400).json({ error: 'Parent not found' });
       }
-
       if (parentFile.type !== 'folder') {
         return res.status(400).json({ error: 'Parent is not a folder' });
       }
@@ -62,8 +55,7 @@ class FilesController {
     };
 
     if (type === 'folder') {
-      const result = await dbClient.db.collection('files').insertOne(fileData);
-      fileData.id = result.insertedId;
+      await dbClient.db.collection('files').insertOne(fileData);
       return res.status(201).json(fileData);
     }
 
@@ -76,11 +68,10 @@ class FilesController {
     fs.writeFileSync(localPath, Buffer.from(data, 'base64'));
 
     fileData.localPath = localPath;
-    const result = await dbClient.db.collection('files').insertOne(fileData);
-    fileData.id = result.insertedId;
+    await dbClient.db.collection('files').insertOne(fileData);
 
     return res.status(201).json({
-      id: fileData.id,
+      id: fileData._id,
       userId: fileData.userId,
       name: fileData.name,
       type: fileData.type,

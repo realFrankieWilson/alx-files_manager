@@ -20,7 +20,5 @@ router.get('/users/me', UsersController.getMe);
 
 // New endpoints for file management
 router.post('/files', FilesController.postUpload);
-router.get('/files/:id', FilesController.getShow);
-router.get('/files', FilesController.getIndex);
 
 module.exports = router;

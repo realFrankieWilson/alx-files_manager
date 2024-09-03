@@ -1,5 +1,4 @@
 const { ObjectId } = require('mongodb');
-const fs = require('fs'); // Import the 'fs' module
 const dbClient = require('../utils/db');
 const redisClient = require('../utils/redis');
 

@@ -1,4 +1,4 @@
-import redis from 'redis';
+const redis = require('redis');
 
 const host = 'localhost';
 const port = 6379;

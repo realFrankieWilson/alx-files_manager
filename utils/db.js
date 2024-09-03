@@ -1,6 +1,6 @@
 const { MongoClient } = require('mongodb');
 
-// Database connecction constants
+// Database connection constants
 const HOST = process.env.DB_HOST || 'localhost';
 const PORT = process.env.DB_PORT || 27017;
 const DATABASE = process.env.DB_DATABASE || 'files_manager';
@@ -11,11 +11,12 @@ const URL = `mongodb://${HOST}:${PORT}`;
  */
 class DBClient {
   /**
-   * Constructs a new DBClient instance and conneccts to the MongDB database.
+   * Constructs a new DBClient instance and connects to the MongoDB database.
    */
   constructor() {
-    // Initializing the MongoDB client with connection URL
-    this.client = new MongoClient(URL, { useUnifiedTopology: true });
+    // Initialize the MongoDB client with connection URL
+    this.client = new MongoClient(URL, { useNewUrlParser: true, useUnifiedTopology: true });
+    
     this.client.connect()
       .then(() => {
         this.db = this.client.db(DATABASE);
@@ -27,13 +28,12 @@ class DBClient {
   }
 
   /**
-   *  Checks if the MongoDB connection is alive.
+   * Checks if the MongoDB connection is alive.
    * @returns {boolean} True if connected, otherwise false.
    */
   isAlive() {
     // Check if the client is connected and the topology is defined
-    return this.client && this.client.topology && this.client.topology.isConnected()
-      ? this.client.topology.isConnected() : false;
+    return this.client && this.client.topology && this.client.topology.isConnected();
   }
 
   /**
@@ -56,7 +56,6 @@ class DBClient {
   /**
    * Asynchronously retrieves the number of documents in the 'files' collection.
    * @returns {Promise<number>} The number of files.
-   * @throws {Error} If the database is not connected
    */
   async nbFiles() {
     try {
@@ -67,6 +66,24 @@ class DBClient {
       return await files.countDocuments();
     } catch (error) {
       console.error('Error fetching number of files:', error);
+      throw error; // rethrow to allow further handling
+    }
+  }
+
+  /**
+   * Asynchronously retrieves a user by token.
+   * @param {string} token - The token used to find the user.
+   * @returns {Promise<Object|null>} The user object if found, or null if not found.
+   */
+  async getUserByToken(token) {
+    try {
+      if (!this.db) {
+        throw new Error('Database not connected');
+      }
+      const user = await this.db.collection('users').findOne({ token: token });
+      return user;
+    } catch (error) {
+      console.error('Error fetching user by token:', error);
       throw error; // rethrow to allow further handling
     }
   }

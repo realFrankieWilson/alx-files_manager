@@ -1,78 +1,74 @@
-const { ObjectId } = require('mongodb');
+const fs = require('fs');
+const { v4: uuidv4 } = require('uuid');
 const dbClient = require('../utils/db');
-const redisClient = require('../utils/redis');
+const { ObjectId } = require('mongodb');
+
+const FOLDER_PATH = process.env.FOLDER_PATH || '/tmp/files_manager';
 
 class FilesController {
-  // GET /files/:id
-  static async getShow(req, res) {
-    const token = req.header('X-Token');
-    const userId = await redisClient.get(`auth_${token}`);
+  static async postUpload(req, res) {
+    const { name, type, parentId = 0, isPublic = false, data } = req.body;
 
-    if (!userId) {
+    // Validate user based on token
+    const token = req.headers['x-token'];
+    const user = await dbClient.getUserByToken(token); // Assuming you have a method to fetch user by token
+    if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const fileId = req.params.id;
+    // Validate input fields
+    if (!name) {
+      return res.status(400).json({ error: 'Missing name' });
+    }
+    if (!type || !['folder', 'file', 'image'].includes(type)) {
+      return res.status(400).json({ error: 'Missing type' });
+    }
+    if (type !== 'folder' && !data) {
+      return res.status(400).json({ error: 'Missing data' });
+    }
 
-    try {
-      const file = await dbClient.db.collection('files').findOne({
-        _id: new ObjectId(fileId),
-        userId: new ObjectId(userId),
-      });
+    // Check parentId if present
+    let parentFile = null;
+    if (parentId !== 0) {
+      parentFile = await dbClient.db.collection('files').findOne({ _id: ObjectId(parentId) });
+      if (!parentFile) {
+        return res.status(400).json({ error: 'Parent not found' });
+      }
+      if (parentFile.type !== 'folder') {
+        return res.status(400).json({ error: 'Parent is not a folder' });
+      }
+    }
 
-      if (!file) {
-        return res.status(404).json({ error: 'Not found' });
+    const fileDoc = {
+      userId: ObjectId(user._id),
+      name,
+      type,
+      isPublic,
+      parentId: parentId === 0 ? '0' : ObjectId(parentId),
+    };
+
+    if (type === 'folder') {
+      // Add folder to the database
+      const result = await dbClient.db.collection('files').insertOne(fileDoc);
+      return res.status(201).json({ id: result.insertedId, ...fileDoc });
+    } else {
+      // Handle file or image
+      const fileName = uuidv4();
+      const filePath = `${FOLDER_PATH}/${fileName}`;
+
+      // Create folder if not exists
+      if (!fs.existsSync(FOLDER_PATH)) {
+        fs.mkdirSync(FOLDER_PATH, { recursive: true });
       }
 
-      return res.status(200).json({
-        id: file._id,
-        userId: file.userId,
-        name: file.name,
-        type: file.type,
-        isPublic: file.isPublic,
-        parentId: file.parentId,
-        localPath: file.localPath,
-        createdAt: file.createdAt,
-      });
-    } catch (error) {
-      return res.status(500).json({ error: 'Server error' });
-    }
-  }
+      // Decode and save the file
+      const fileContent = Buffer.from(data, 'base64');
+      fs.writeFileSync(filePath, fileContent);
 
-  // GET /files
-  static async getIndex(req, res) {
-    const token = req.header('X-Token');
-    const userId = await redisClient.get(`auth_${token}`);
-
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const parentId = req.query.parentId || '0';
-    const page = parseInt(req.query.page, 10) || 0;
-    const limit = 20;
-
-    try {
-      const files = await dbClient.db.collection('files')
-        .aggregate([
-          { $match: { userId: new ObjectId(userId), parentId: parentId === '0' ? '0' : new ObjectId(parentId) } },
-          { $skip: page * limit },
-          { $limit: limit },
-        ])
-        .toArray();
-
-      const formattedFiles = files.map((file) => ({
-        id: file._id,
-        userId: file.userId,
-        name: file.name,
-        type: file.type,
-        isPublic: file.isPublic,
-        parentId: file.parentId,
-      }));
-
-      return res.status(200).json(formattedFiles);
-    } catch (error) {
-      return res.status(500).json({ error: 'Server error' });
+      // Save file in the database
+      fileDoc.localPath = filePath;
+      const result = await dbClient.db.collection('files').insertOne(fileDoc);
+      return res.status(201).json({ id: result.insertedId, ...fileDoc });
     }
   }
 }

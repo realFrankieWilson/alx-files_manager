@@ -1,7 +1,7 @@
 const sha1 = require('sha1'); // Import the sha1 module for hashing passwords
-const { ObjectId } = require('mongodb'); // Import ObjectId from the MongoDB library
 const redisClient = require('../utils/redis'); // Correctly import the Redis client utility
 const dbClient = require('../utils/db'); // Import the DB utility
+const { ObjectId } = require('mongodb'); // Import ObjectId from the MongoDB library
 
 class UsersController {
   static async postNew(req, res) {
@@ -44,7 +44,7 @@ class UsersController {
     }
   }
 
-  // New endpoint for retrieving user information based on the token
+    // New endpoint for retrieving user information based on the token
   static async getMe(req, res) {
     const token = req.header('X-Token');
     if (!token) {

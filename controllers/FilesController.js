@@ -36,6 +36,10 @@ class FilesController {
 
     // Validate parentId if set
     if (parentId !== '0') {
+      if (!ObjectId.isValid(parentId)) {
+        return res.status(400).json({ error: 'Invalid parentId' });
+      }
+
       try {
         const parentFile = await dbClient.db.collection('files').findOne({ _id: new ObjectId(parentId) });
         if (!parentFile) {
@@ -45,7 +49,7 @@ class FilesController {
           return res.status(400).json({ error: 'Parent is not a folder' });
         }
       } catch (err) {
-        return res.status(400).json({ error: 'Invalid parentId' });
+        return res.status(400).json({ error: 'Parent not found' });
       }
     }
 

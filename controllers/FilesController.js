@@ -5,8 +5,11 @@ const redisClient = require('../utils/redis');
 const dbClient = require('../utils/db');
 
 class FilesController {
+  /**
+   * Handle file upload (POST /files).
+   */
   static async postUpload(req, res) {
-    // Step 1: Validate the user's token
+    // Step 1: Retrieve the user based on the token
     const token = req.header('X-Token');
     if (!token) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -17,7 +20,7 @@ class FilesController {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Step 2: Validate the request fields
+    // Step 2: Extract and validate request body fields
     const {
       name, type, parentId = 0, isPublic = false, data,
     } = req.body;
@@ -34,11 +37,10 @@ class FilesController {
       return res.status(400).json({ error: 'Missing data' });
     }
 
-    // Step 3: Validate the parent ID if it is set
-    let parentFile = null;
+    // Step 3: Validate parentId if provided
     if (parentId !== 0) {
       try {
-        parentFile = await dbClient.db.collection('files').findOne({ _id: new ObjectId(parentId) });
+        const parentFile = await dbClient.db.collection('files').findOne({ _id: new ObjectId(parentId) });
         if (!parentFile) {
           return res.status(400).json({ error: 'Parent not found' });
         }
@@ -85,12 +87,17 @@ class FilesController {
 
     const localPath = `${folderPath}/${uuidv4()}`;
     try {
+      // Convert Base64 data to binary and save it to local file system
       fs.writeFileSync(localPath, Buffer.from(data, 'base64'));
 
+      // Add localPath to file data
       fileData.localPath = localPath;
+
+      // Insert the file document into the database
       const result = await dbClient.db.collection('files').insertOne(fileData);
       fileData.id = result.insertedId;
 
+      // Return the response with the created file object
       return res.status(201).json({
         id: fileData.id,
         userId: fileData.userId,
@@ -102,6 +109,89 @@ class FilesController {
       });
     } catch (error) {
       return res.status(500).json({ error: 'Unable to save file' });
+    }
+  }
+
+  /**
+   * Retrieve a specific file document based on the ID (GET /files/:id).
+   */
+  static async getShow(req, res) {
+    const token = req.header('X-Token');
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const userId = await redisClient.get(`auth_${token}`);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const fileId = req.params.id;
+      const file = await dbClient.db.collection('files').findOne({ _id: new ObjectId(fileId), userId: new ObjectId(userId) });
+
+      if (!file) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      return res.status(200).json({
+        id: file._id,
+        userId: file.userId,
+        name: file.name,
+        type: file.type,
+        isPublic: file.isPublic,
+        parentId: file.parentId,
+      });
+    } catch (error) {
+      return res.status(500).json({ error: 'Server error' });
+    }
+  }
+
+  /**
+   * Retrieve all user file documents for a specific parentId with pagination (GET /files).
+   */
+  static async getIndex(req, res) {
+    const token = req.header('X-Token');
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const userId = await redisClient.get(`auth_${token}`);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const parentId = req.query.parentId || '0';
+    const page = parseInt(req.query.page, 10) || 0;
+    const limit = 20;
+
+    try {
+      const query = { userId: new ObjectId(userId) };
+      if (parentId !== '0') {
+        query.parentId = new ObjectId(parentId);
+      } else {
+        query.parentId = '0';
+      }
+
+      const files = await dbClient.db.collection('files')
+        .aggregate([
+          { $match: query },
+          { $skip: page * limit },
+          { $limit: limit },
+        ]).toArray();
+
+      const formattedFiles = files.map((file) => ({
+        id: file._id,
+        userId: file.userId,
+        name: file.name,
+        type: file.type,
+        isPublic: file.isPublic,
+        parentId: file.parentId,
+      }));
+
+      return res.status(200).json(formattedFiles);
+    } catch (error) {
+      return res.status(500).json({ error: 'Server error' });
     }
   }
 }

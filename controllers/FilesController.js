@@ -194,6 +194,73 @@ class FilesController {
       return res.status(500).json({ error: 'Server error' });
     }
   }
+
+  static async putPublish(req, res) {
+    const token = req.header('X-Token');
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+    const userId = awiat redisClient.get(`auth_${token}`);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const fileId = req.params.id;
+      const file = await dbClient.db.collection('files').findOne({ _id: new ObjectId(fileId), userId: new ObjectId(userId) });
+
+      if (!file) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      await dbClient.db.collection('files').updateOne(
+        { _id: new ObjectId(fileId) },
+        { $set: { isPublic: true } }
+      );
+
+      // Updated file document
+      return res.status(200).json({
+        id: file._id,
+        userId: file.userId,
+        name: file.name,
+        type: file.type,
+        isPublic: true,
+        parentId: file.parentId,
+      });
+    } catch (error) {
+      return res.status(500).json({ error: 'Server error' });
+    }
+
+    try {
+      const fileId = req.params.id;
+      const file = await dbClient.db.collection('files').findOne({
+        _id: new ObjectId(fileId), userId: new ObjectId(userId)
+      });
+
+      if (!file) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      // Update isPublic to false
+      await dbClient.db.collection('files').updateOne(
+        { _id: new ObjectId(fileId) },
+        { $set: { isPublic: false } }
+      );
+
+      // Returns Updated file document
+      return res.status(200).json({
+        id: file._id,
+        userId: file.userId,
+        name: file.name,
+        type: file.type,
+        isPublic: false,
+        parentId: file.parentId,
+      });
+    } catch (error) {
+      return res.status(500).json({ error: 'Server error' });
+    }
+  }
 }
 
 module.exports = FilesController;

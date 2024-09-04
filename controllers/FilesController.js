@@ -5,8 +5,11 @@ const redisClient = require('../utils/redis');
 const dbClient = require('../utils/db');
 
 class FilesController {
+  /**
+   * Handle file upload (POST /files).
+   */
   static async postUpload(req, res) {
-    // Step 1: Validate the user's token
+    // Step 1: Retrieve the user based on the token
     const token = req.header('X-Token');
     if (!token) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -17,7 +20,7 @@ class FilesController {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Step 2: Validate the request fields
+    // Step 2: Extract and validate request body fields
     const {
       name, type, parentId = 0, isPublic = false, data,
     } = req.body;
@@ -34,11 +37,10 @@ class FilesController {
       return res.status(400).json({ error: 'Missing data' });
     }
 
-    // Step 3: Validate the parent ID if it is set
-    let parentFile = null;
+    // Step 3: Validate parentId if provided
     if (parentId !== 0) {
       try {
-        parentFile = await dbClient.db.collection('files').findOne({ _id: new ObjectId(parentId) });
+        const parentFile = await dbClient.db.collection('files').findOne({ _id: new ObjectId(parentId) });
         if (!parentFile) {
           return res.status(400).json({ error: 'Parent not found' });
         }
@@ -85,12 +87,17 @@ class FilesController {
 
     const localPath = `${folderPath}/${uuidv4()}`;
     try {
+      // Convert Base64 data to binary and save it to local file system
       fs.writeFileSync(localPath, Buffer.from(data, 'base64'));
 
+      // Add localPath to file data
       fileData.localPath = localPath;
+
+      // Insert the file document into the database
       const result = await dbClient.db.collection('files').insertOne(fileData);
       fileData.id = result.insertedId;
 
+      // Return the response with the created file object
       return res.status(201).json({
         id: fileData.id,
         userId: fileData.userId,

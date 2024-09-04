@@ -6,6 +6,7 @@ const dbClient = require('../utils/db');
 
 class FilesController {
   static async postUpload(req, res) {
+    // Step 1: Validate the user's token
     const token = req.header('X-Token');
     if (!token) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -16,11 +17,11 @@ class FilesController {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
+    // Step 2: Validate the request fields
     const {
       name, type, parentId = 0, isPublic = false, data,
     } = req.body;
 
-    // Check for missing fields
     if (!name) {
       return res.status(400).json({ error: 'Missing name' });
     }
@@ -29,11 +30,11 @@ class FilesController {
       return res.status(400).json({ error: 'Missing type' });
     }
 
-    if (!data && type !== 'folder') {
+    if (type !== 'folder' && !data) {
       return res.status(400).json({ error: 'Missing data' });
     }
 
-    // Check if parentId is valid
+    // Step 3: Validate the parent ID if it is set
     let parentFile = null;
     if (parentId !== 0) {
       try {
@@ -49,7 +50,7 @@ class FilesController {
       }
     }
 
-    // Prepare file data
+    // Step 4: Prepare the file data object for insertion
     const fileData = {
       userId: new ObjectId(userId),
       name,
@@ -58,35 +59,50 @@ class FilesController {
       parentId: parentId === 0 ? '0' : new ObjectId(parentId),
     };
 
-    // If type is folder, save to DB and return response
+    // Step 5: Handle creation of folder-type files
     if (type === 'folder') {
-      const result = await dbClient.db.collection('files').insertOne(fileData);
-      fileData.id = result.insertedId;
-      return res.status(201).json(fileData);
+      try {
+        const result = await dbClient.db.collection('files').insertOne(fileData);
+        fileData.id = result.insertedId;
+        return res.status(201).json({
+          id: fileData.id,
+          userId: fileData.userId,
+          name: fileData.name,
+          type: fileData.type,
+          isPublic: fileData.isPublic,
+          parentId: fileData.parentId,
+        });
+      } catch (error) {
+        return res.status(500).json({ error: 'Unable to create folder' });
+      }
     }
 
-    // If type is file or image, save file to disk
+    // Step 6: Handle creation of file or image-type files
     const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
     if (!fs.existsSync(folderPath)) {
       fs.mkdirSync(folderPath, { recursive: true });
     }
 
     const localPath = `${folderPath}/${uuidv4()}`;
-    fs.writeFileSync(localPath, Buffer.from(data, 'base64'));
+    try {
+      fs.writeFileSync(localPath, Buffer.from(data, 'base64'));
 
-    fileData.localPath = localPath;
-    const result = await dbClient.db.collection('files').insertOne(fileData);
-    fileData.id = result.insertedId;
+      fileData.localPath = localPath;
+      const result = await dbClient.db.collection('files').insertOne(fileData);
+      fileData.id = result.insertedId;
 
-    // Return the created file response
-    return res.status(201).json({
-      id: fileData.id,
-      userId: fileData.userId,
-      name: fileData.name,
-      type: fileData.type,
-      isPublic: fileData.isPublic,
-      parentId: fileData.parentId,
-    });
+      return res.status(201).json({
+        id: fileData.id,
+        userId: fileData.userId,
+        name: fileData.name,
+        type: fileData.type,
+        isPublic: fileData.isPublic,
+        parentId: fileData.parentId,
+        localPath: fileData.localPath,
+      });
+    } catch (error) {
+      return res.status(500).json({ error: 'Unable to save file' });
+    }
   }
 }
 

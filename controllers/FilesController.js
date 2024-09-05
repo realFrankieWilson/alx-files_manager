@@ -195,13 +195,18 @@ class FilesController {
     }
   }
 
+  /* -----------------Edit-------------------*/
+
+  /**
+   * Publish a file document based on the ID (PUT /files/:id/publish).
+  */
   static async putPublish(req, res) {
     const token = req.header('X-Token');
     if (!token) {
       return res.status(401).json({ error: 'Unauthorized' });
-  }
+    }
 
-    const userId = awiat redisClient.get(`auth_${token}`);
+    const userId = await redisClient.get(`auth_${token}`);
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -216,7 +221,7 @@ class FilesController {
 
       await dbClient.db.collection('files').updateOne(
         { _id: new ObjectId(fileId) },
-        { $set: { isPublic: true } }
+        { $set: { isPublic: true } },
       );
 
       // Updated file document
@@ -231,29 +236,40 @@ class FilesController {
     } catch (error) {
       return res.status(500).json({ error: 'Server error' });
     }
+  }
+
+  /**
+   * Unpublish a file document based on the ID (PUT /files/:ID/unpublish).
+  */
+  static async putUnpublish(req, res) {
+    const token = req.header('X-Token');
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const userId = await redisClient.get(`auth_${token}`);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
     try {
       const fileId = req.params.id;
-      const file = await dbClient.db.collection('files').findOne({
-        _id: new ObjectId(fileId), userId: new ObjectId(userId)
-      });
+      const file = await dbClient.db.collection('files').findOne({ _id: new ObjectId(fileId), userId: new ObjectId(userId) });
 
       if (!file) {
         return res.status(404).json({ error: 'Not found' });
       }
 
-      // Update isPublic to false
       await dbClient.db.collection('files').updateOne(
         { _id: new ObjectId(fileId) },
-        { $set: { isPublic: false } }
+        { $set: { isPublic: false } },
       );
 
-      // Returns Updated file document
       return res.status(200).json({
         id: file._id,
         userId: file.userId,
         name: file.name,
-        type: file.type,
+        type: file.name,
         isPublic: false,
         parentId: file.parentId,
       });
